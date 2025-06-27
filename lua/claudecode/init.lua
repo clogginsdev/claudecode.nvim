@@ -47,9 +47,10 @@ function M.open_claude(args)
   
   -- Create the split first
   local split_cmd = config.split_direction == "vertical" and "vsplit" or "split"
-  vim.cmd(split_cmd)
+  vim.cmd(split_cmd .. " new")  -- Create split with a new buffer
   
   state.win = vim.api.nvim_get_current_win()
+  state.buf = vim.api.nvim_get_current_buf()
   
   -- Set window size
   if config.split_direction == "vertical" then
@@ -64,7 +65,7 @@ function M.open_claude(args)
     claude_cmd = claude_cmd .. " " .. args
   end
   
-  -- Open terminal in the current window
+  -- Open terminal in the new buffer
   state.job_id = vim.fn.termopen(claude_cmd, {
     on_exit = function(_, exit_code, _)
       state.session_active = false
@@ -73,8 +74,6 @@ function M.open_claude(args)
     end,
   })
   
-  -- Get the buffer that termopen created
-  state.buf = vim.api.nvim_get_current_buf()
   vim.api.nvim_buf_set_name(state.buf, "Claude Code")
   
   state.session_active = true
