@@ -45,10 +45,11 @@ function M.open_claude(args)
     return
   end
   
-  -- Create the split first
+  -- Create split with a new buffer
   local split_cmd = config.split_direction == "vertical" and "vsplit" or "split"
-  vim.cmd(split_cmd .. " new")  -- Create split with a new buffer
+  vim.cmd(split_cmd .. " new")
   
+  -- Store references to the new window and buffer
   state.win = vim.api.nvim_get_current_win()
   state.buf = vim.api.nvim_get_current_buf()
   
@@ -74,7 +75,8 @@ function M.open_claude(args)
     end,
   })
   
-  vim.api.nvim_buf_set_name(state.buf, "Claude Code")
+  -- Set buffer name, but only if it doesn't conflict
+  pcall(vim.api.nvim_buf_set_name, state.buf, "Claude Code")
   
   state.session_active = true
   
@@ -92,6 +94,11 @@ function M.close_claude()
   if state.win and vim.api.nvim_win_is_valid(state.win) then
     vim.api.nvim_win_close(state.win, true)
     state.win = nil
+  end
+  
+  -- Delete the buffer to free up the name
+  if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
+    vim.api.nvim_buf_delete(state.buf, { force = true })
   end
   
   state.buf = nil
