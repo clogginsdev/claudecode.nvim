@@ -45,37 +45,37 @@ function M.open_claude(args)
     return
   end
   
-  if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then
-    state.buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_option(state.buf, "buftype", "terminal")
-    vim.api.nvim_buf_set_option(state.buf, "buflisted", false)
-    vim.api.nvim_buf_set_option(state.buf, "swapfile", false)
-    vim.api.nvim_buf_set_name(state.buf, "Claude Code")
-  end
-  
+  -- Create the split first
   local split_cmd = config.split_direction == "vertical" and "vsplit" or "split"
   vim.cmd(split_cmd)
   
   state.win = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_set_buf(state.win, state.buf)
   
+  -- Set window size
   if config.split_direction == "vertical" then
     vim.api.nvim_win_set_width(state.win, config.split_size)
   else
     vim.api.nvim_win_set_height(state.win, config.split_size)
   end
   
+  -- Build the command
   local claude_cmd = config.claude_command
   if args and args ~= "" then
     claude_cmd = claude_cmd .. " " .. args
   end
   
+  -- Open terminal in the current window
   state.job_id = vim.fn.termopen(claude_cmd, {
     on_exit = function(_, exit_code, _)
       state.session_active = false
       state.job_id = nil
+      state.buf = nil
     end,
   })
+  
+  -- Get the buffer that termopen created
+  state.buf = vim.api.nvim_get_current_buf()
+  vim.api.nvim_buf_set_name(state.buf, "Claude Code")
   
   state.session_active = true
   
@@ -95,6 +95,7 @@ function M.close_claude()
     state.win = nil
   end
   
+  state.buf = nil
   state.session_active = false
 end
 
