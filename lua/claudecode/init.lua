@@ -182,54 +182,31 @@ function M.edit_selection(is_visual)
     local filepath = vim.api.nvim_buf_get_name(0)
     local filetype = vim.bo.filetype
     
-    -- Construct the prompt for Claude
+    -- Construct the prompt for Claude to edit the file directly
     local prompt = string.format(
-      "Edit the following %s code according to this instruction: %s\n\n" ..
-      "Return ONLY the edited code without any explanation or markdown code blocks.\n\n" ..
-      "Original code:\n%s",
-      filetype,
+      "Edit the file %s\n" ..
+      "Find and replace the following code section with an edited version according to this instruction: %s\n\n" ..
+      "Code to find and edit:\n%s",
+      filepath,
       instruction,
       selected_text
     )
     
-    -- Create a temporary file with the prompt
-    local tmp_file = vim.fn.tempname()
-    local file = io.open(tmp_file, "w")
-    file:write(prompt)
-    file:close()
-    
     -- Execute Claude in headless mode
-    local cmd = string.format("%s -p \"$(cat %s)\" --output-format text", config.claude_command, tmp_file)
+    local cmd = string.format("%s -p %q", config.claude_command, prompt)
     
     vim.fn.jobstart(cmd, {
-      stdout_buffered = true,
-      on_stdout = function(_, data, _)
-        if data and #data > 0 then
-          -- Filter out empty strings
-          local result = {}
-          for _, line in ipairs(data) do
-            if line ~= "" then
-              table.insert(result, line)
-            end
-          end
-          
-          if #result > 0 then
-            -- Replace the selected text with the edited version
-            vim.api.nvim_buf_set_lines(0, start_line, end_line, false, result)
-            vim.notify("Code edited successfully", vim.log.levels.INFO)
-          end
-        end
-      end,
       on_stderr = function(_, data, _)
         if data and #data > 0 and data[1] ~= "" then
           vim.notify("Claude Code error: " .. table.concat(data, "\n"), vim.log.levels.ERROR)
         end
       end,
       on_exit = function(_, exit_code, _)
-        -- Clean up temp file
-        os.remove(tmp_file)
-        
-        if exit_code ~= 0 then
+        if exit_code == 0 then
+          -- Reload the buffer to show Claude's edits
+          vim.cmd("edit!")
+          vim.notify("Code edited successfully", vim.log.levels.INFO)
+        else
           vim.notify("Claude Code exited with code: " .. exit_code, vim.log.levels.ERROR)
         end
       end,
