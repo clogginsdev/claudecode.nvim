@@ -6,6 +6,7 @@ A Neovim plugin that integrates [Claude Code](https://claude.ai/code) directly i
 
 - Open Claude Code in a vertical or horizontal split
 - Continue previous Claude Code sessions
+- **Edit selected code with Claude in headless mode** - highlight code and get AI-powered edits
 - Configurable split size and direction
 - Automatic focus on terminal when opened
 - Clean session management
@@ -51,6 +52,7 @@ Default configuration:
   split_size = 80,               -- width for vertical, height for horizontal
   claude_command = "claude",     -- command to run Claude Code
   auto_focus = true,             -- auto-focus terminal when opened
+  edit_keymap = "<leader>ce",    -- keymap for editing selected code
 }
 ```
 
@@ -62,6 +64,7 @@ Default configuration:
 - `:ClaudeCode <args>` - Open Claude Code with additional arguments
 - `:ClaudeCodeContinue` - Continue the previous Claude Code session (equivalent to `claude -c`)
 - `:ClaudeCodeClose` - Close the Claude Code split
+- `:ClaudeCodeEdit` - Edit selected code with Claude (works in visual mode)
 
 ### Example Workflow
 
@@ -70,6 +73,13 @@ Default configuration:
 3. Ask Claude to help with your code
 4. Use `Ctrl+C` to stop Claude Code when done
 5. Run `:ClaudeCodeClose` to close the split
+
+### Editing Code with Claude
+
+1. Select code in visual mode (press `v` and move cursor)
+2. Press `<leader>ce` (or your configured keymap) or run `:ClaudeCodeEdit`
+3. Enter your edit instruction in the prompt
+4. Claude will edit the code and replace your selection automatically
 
 ### Tips
 

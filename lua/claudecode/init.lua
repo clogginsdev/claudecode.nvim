@@ -5,6 +5,7 @@ local config = {
   split_size = 80,
   claude_command = "claude",
   auto_focus = true,
+  edit_keymap = "<leader>ce",  -- Default keymap for edit command
 }
 
 local state = {
@@ -35,6 +36,20 @@ function M.setup(opts)
   end, {
     desc = "Close Claude Code split"
   })
+  
+  vim.api.nvim_create_user_command("ClaudeCodeEdit", function(cmd_opts)
+    M.edit_selection(cmd_opts.range == 2)
+  end, {
+    range = true,
+    desc = "Edit selected code with Claude"
+  })
+  
+  -- Set up keymapping if configured
+  if config.edit_keymap and config.edit_keymap ~= "" then
+    vim.keymap.set("v", config.edit_keymap, ":ClaudeCodeEdit<CR>", {
+      desc = "Edit selection with Claude Code"
+    })
+  end
 end
 
 function M.open_claude(args)
@@ -112,6 +127,114 @@ function M.send_to_claude(text)
   end
   
   vim.fn.chansend(state.job_id, text .. "\n")
+end
+
+-- Get selected text from visual mode
+local function get_visual_selection()
+  local start_pos = vim.fn.getpos("'<")
+  local end_pos = vim.fn.getpos("'>")
+  local start_line = start_pos[2]
+  local end_line = end_pos[2]
+  local start_col = start_pos[3]
+  local end_col = end_pos[3]
+  
+  local lines = vim.api.nvim_buf_get_lines(0, start_line - 1, end_line, false)
+  
+  -- Handle single line selection
+  if #lines == 1 then
+    lines[1] = string.sub(lines[1], start_col, end_col)
+  else
+    -- Handle multi-line selection
+    lines[1] = string.sub(lines[1], start_col)
+    if #lines > 1 then
+      lines[#lines] = string.sub(lines[#lines], 1, end_col)
+    end
+  end
+  
+  return lines, start_line - 1, end_line
+end
+
+function M.edit_selection(is_visual)
+  local lines, start_line, end_line
+  
+  if is_visual then
+    lines, start_line, end_line = get_visual_selection()
+  else
+    -- If not visual mode, get current line
+    local current_line = vim.api.nvim_win_get_cursor(0)[1]
+    lines = vim.api.nvim_buf_get_lines(0, current_line - 1, current_line, false)
+    start_line = current_line - 1
+    end_line = current_line
+  end
+  
+  local selected_text = table.concat(lines, "\n")
+  
+  -- Get user input for the edit instruction
+  vim.ui.input({
+    prompt = "How would you like to edit this code? ",
+    default = "",
+  }, function(instruction)
+    if not instruction or instruction == "" then
+      return
+    end
+    
+    -- Get the current file path and language
+    local filepath = vim.api.nvim_buf_get_name(0)
+    local filetype = vim.bo.filetype
+    
+    -- Construct the prompt for Claude
+    local prompt = string.format(
+      "Edit the following %s code according to this instruction: %s\n\n" ..
+      "Return ONLY the edited code without any explanation or markdown code blocks.\n\n" ..
+      "Original code:\n%s",
+      filetype,
+      instruction,
+      selected_text
+    )
+    
+    -- Create a temporary file with the prompt
+    local tmp_file = vim.fn.tempname()
+    local file = io.open(tmp_file, "w")
+    file:write(prompt)
+    file:close()
+    
+    -- Execute Claude in headless mode
+    local cmd = string.format("%s -p \"$(cat %s)\" --output-format text", config.claude_command, tmp_file)
+    
+    vim.fn.jobstart(cmd, {
+      stdout_buffered = true,
+      on_stdout = function(_, data, _)
+        if data and #data > 0 then
+          -- Filter out empty strings
+          local result = {}
+          for _, line in ipairs(data) do
+            if line ~= "" then
+              table.insert(result, line)
+            end
+          end
+          
+          if #result > 0 then
+            -- Replace the selected text with the edited version
+            vim.api.nvim_buf_set_lines(0, start_line, end_line, false, result)
+            vim.notify("Code edited successfully", vim.log.levels.INFO)
+          end
+        end
+      end,
+      on_stderr = function(_, data, _)
+        if data and #data > 0 and data[1] ~= "" then
+          vim.notify("Claude Code error: " .. table.concat(data, "\n"), vim.log.levels.ERROR)
+        end
+      end,
+      on_exit = function(_, exit_code, _)
+        -- Clean up temp file
+        os.remove(tmp_file)
+        
+        if exit_code ~= 0 then
+          vim.notify("Claude Code exited with code: " .. exit_code, vim.log.levels.ERROR)
+        end
+      end,
+    })
+  end)
 end
 
 return M
