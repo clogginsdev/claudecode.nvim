@@ -192,25 +192,41 @@ function M.edit_selection(is_visual)
       selected_text
     )
     
-    -- Execute Claude in headless mode
+    -- Create a hidden split for terminal
+    vim.cmd("botright 1new")
+    local term_win = vim.api.nvim_get_current_win()
+    local term_buf = vim.api.nvim_get_current_buf()
+    
+    -- Hide the terminal window
+    vim.api.nvim_win_set_height(term_win, 1)
+    
+    -- Execute Claude command in terminal
     local cmd = string.format("%s -p %q", config.claude_command, prompt)
     
-    vim.fn.jobstart(cmd, {
-      on_stderr = function(_, data, _)
-        if data and #data > 0 and data[1] ~= "" then
-          vim.notify("Claude Code error: " .. table.concat(data, "\n"), vim.log.levels.ERROR)
-        end
-      end,
+    -- Notify user that command is being sent
+    vim.notify("Sending edit request to Claude...", vim.log.levels.INFO)
+    
+    local job_id = vim.fn.termopen(cmd, {
       on_exit = function(_, exit_code, _)
-        if exit_code == 0 then
-          -- Reload the buffer to show Claude's edits
-          vim.cmd("edit!")
-          vim.notify("Code edited successfully", vim.log.levels.INFO)
-        else
-          vim.notify("Claude Code exited with code: " .. exit_code, vim.log.levels.ERROR)
-        end
+        vim.schedule(function()
+          -- Close the terminal window
+          if vim.api.nvim_win_is_valid(term_win) then
+            vim.api.nvim_win_close(term_win, true)
+          end
+          
+          if exit_code == 0 then
+            -- Return focus to original window and reload
+            vim.cmd("edit!")
+            vim.notify("Claude has completed the edit", vim.log.levels.INFO)
+          else
+            vim.notify("Claude exited with code: " .. exit_code, vim.log.levels.ERROR)
+          end
+        end)
       end,
     })
+    
+    -- Return focus to the original window immediately
+    vim.cmd("wincmd p")
   end)
 end
 
