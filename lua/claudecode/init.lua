@@ -273,23 +273,20 @@ end
 
 -- Execute Claude Code with the given prompt
 function M.execute_claude_edit(prompt)
-  -- Execute Claude command in the background
+  -- Create a hidden terminal buffer for Claude Code
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  
+  -- Set buffer options for terminal
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = bufnr })
+  vim.api.nvim_set_option_value("buftype", "terminal", { buf = bufnr })
+  
+  -- Build the command
   local cmd = string.format("%s -p %q", config.claude_command, prompt)
   
-  vim.notify("Executing: " .. cmd, vim.log.levels.INFO)
+  vim.notify("Executing Claude Code...", vim.log.levels.INFO)
   
-  -- Run the command asynchronously with more debugging
-  local job_id = vim.fn.jobstart(cmd, {
-    on_stdout = function(_, data, _)
-      if data and #data > 0 then
-        vim.notify("Claude output: " .. vim.inspect(data), vim.log.levels.DEBUG)
-      end
-    end,
-    on_stderr = function(_, data, _)
-      if data and #data > 0 then
-        vim.notify("Claude error: " .. vim.inspect(data), vim.log.levels.WARN)
-      end
-    end,
+  -- Start terminal in the hidden buffer
+  local job_id = vim.fn.termopen(cmd, {
     on_exit = function(_, exit_code, _)
       vim.schedule(function()
         vim.notify("Claude finished with exit code: " .. exit_code, vim.log.levels.INFO)
@@ -300,16 +297,21 @@ function M.execute_claude_edit(prompt)
         else
           vim.notify("Claude exited with code: " .. exit_code, vim.log.levels.ERROR)
         end
+        
+        -- Clean up the hidden buffer
+        if vim.api.nvim_buf_is_valid(bufnr) then
+          vim.api.nvim_buf_delete(bufnr, { force = true })
+        end
       end)
     end,
   })
   
   if job_id == 0 then
-    vim.notify("Failed to start Claude Code job", vim.log.levels.ERROR)
+    vim.notify("Failed to start Claude Code terminal", vim.log.levels.ERROR)
   elseif job_id == -1 then
     vim.notify("Invalid arguments for Claude Code", vim.log.levels.ERROR)
   else
-    vim.notify("Claude Code job started with ID: " .. job_id, vim.log.levels.INFO)
+    vim.notify("Claude Code started in background (buffer: " .. bufnr .. ")", vim.log.levels.INFO)
   end
 end
 
