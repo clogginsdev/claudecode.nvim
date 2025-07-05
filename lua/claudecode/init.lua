@@ -221,8 +221,8 @@ function M.create_floating_input(prompt, callback)
   })
   
   -- Set buffer options
-  vim.api.nvim_buf_set_option(input_buf, "bufhidden", "wipe")
-  vim.api.nvim_buf_set_option(input_buf, "buftype", "nofile")
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = input_buf })
+  vim.api.nvim_set_option_value("buftype", "nofile", { buf = input_buf })
   
   -- Add prompt text
   vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, {"", ""})
@@ -307,8 +307,8 @@ function M.create_terminal_modal(prompt, position_line)
   })
 
   -- Set terminal buffer options
-  vim.api.nvim_buf_set_option(modal_buf, "bufhidden", "wipe")
-  vim.api.nvim_buf_set_option(modal_buf, "buftype", "terminal")
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = modal_buf })
+  vim.api.nvim_set_option_value("buftype", "terminal", { buf = modal_buf })
 
   -- Execute Claude command in the modal terminal
   local cmd = string.format("%s -p %q", config.claude_command, prompt)
