@@ -276,12 +276,23 @@ function M.execute_claude_edit(prompt)
   -- Execute Claude command in the background
   local cmd = string.format("%s -p %q", config.claude_command, prompt)
   
-  vim.notify("Executing Claude Code...", vim.log.levels.INFO)
+  vim.notify("Executing: " .. cmd, vim.log.levels.INFO)
   
-  -- Run the command asynchronously
-  vim.fn.jobstart(cmd, {
+  -- Run the command asynchronously with more debugging
+  local job_id = vim.fn.jobstart(cmd, {
+    on_stdout = function(_, data, _)
+      if data and #data > 0 then
+        vim.notify("Claude output: " .. vim.inspect(data), vim.log.levels.DEBUG)
+      end
+    end,
+    on_stderr = function(_, data, _)
+      if data and #data > 0 then
+        vim.notify("Claude error: " .. vim.inspect(data), vim.log.levels.WARN)
+      end
+    end,
     on_exit = function(_, exit_code, _)
       vim.schedule(function()
+        vim.notify("Claude finished with exit code: " .. exit_code, vim.log.levels.INFO)
         if exit_code == 0 then
           -- Reload the file to show changes
           vim.cmd("edit!")
@@ -292,6 +303,14 @@ function M.execute_claude_edit(prompt)
       end)
     end,
   })
+  
+  if job_id == 0 then
+    vim.notify("Failed to start Claude Code job", vim.log.levels.ERROR)
+  elseif job_id == -1 then
+    vim.notify("Invalid arguments for Claude Code", vim.log.levels.ERROR)
+  else
+    vim.notify("Claude Code job started with ID: " .. job_id, vim.log.levels.INFO)
+  end
 end
 
 return M
