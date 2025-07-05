@@ -171,11 +171,8 @@ function M.edit_selection(is_visual)
 
   local selected_text = table.concat(lines, "\n")
 
-  -- Get user input for the edit instruction
-  vim.ui.input({
-    prompt = "How would you like to edit this code? ",
-    default = "",
-  }, function(instruction)
+  -- Get user input for the edit instruction using floating input
+  M.create_floating_input("How would you like to edit this code? ", function(instruction)
     if not instruction or instruction == "" then
       return
     end
@@ -197,6 +194,81 @@ function M.edit_selection(is_visual)
     -- Create floating terminal modal
     M.create_terminal_modal(prompt, start_line)
   end)
+end
+
+-- Create a floating input window
+function M.create_floating_input(prompt, callback)
+  -- Create buffer for input
+  local input_buf = vim.api.nvim_create_buf(false, true)
+  
+  -- Calculate window size and position
+  local width = 60
+  local height = 3
+  local row = math.floor((vim.o.lines - height) / 2)
+  local col = math.floor((vim.o.columns - width) / 2)
+  
+  -- Create floating window
+  local input_win = vim.api.nvim_open_win(input_buf, true, {
+    relative = "editor",
+    width = width,
+    height = height,
+    row = row,
+    col = col,
+    style = "minimal",
+    border = "rounded",
+    title = " " .. prompt,
+    title_pos = "center",
+  })
+  
+  -- Set buffer options
+  vim.api.nvim_buf_set_option(input_buf, "bufhidden", "wipe")
+  vim.api.nvim_buf_set_option(input_buf, "buftype", "nofile")
+  
+  -- Add prompt text
+  vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, {"", ""})
+  
+  -- Position cursor on second line for input
+  vim.api.nvim_win_set_cursor(input_win, {2, 0})
+  
+  -- Enter insert mode
+  vim.cmd("startinsert")
+  
+  -- Function to handle input completion
+  local function complete_input()
+    local lines = vim.api.nvim_buf_get_lines(input_buf, 0, -1, false)
+    local input_text = ""
+    
+    -- Concatenate all non-empty lines
+    for _, line in ipairs(lines) do
+      if line ~= "" then
+        input_text = input_text .. line .. " "
+      end
+    end
+    
+    input_text = vim.trim(input_text)
+    
+    -- Close the window
+    if vim.api.nvim_win_is_valid(input_win) then
+      vim.api.nvim_win_close(input_win, true)
+    end
+    
+    -- Call the callback with the input
+    callback(input_text)
+  end
+  
+  -- Function to cancel input
+  local function cancel_input()
+    if vim.api.nvim_win_is_valid(input_win) then
+      vim.api.nvim_win_close(input_win, true)
+    end
+  end
+  
+  -- Set up keymaps
+  vim.keymap.set("i", "<CR>", complete_input, { buffer = input_buf, nowait = true })
+  vim.keymap.set("i", "<Esc>", cancel_input, { buffer = input_buf, nowait = true })
+  vim.keymap.set("n", "<CR>", complete_input, { buffer = input_buf, nowait = true })
+  vim.keymap.set("n", "<Esc>", cancel_input, { buffer = input_buf, nowait = true })
+  vim.keymap.set("n", "q", cancel_input, { buffer = input_buf, nowait = true })
 end
 
 -- Create a floating terminal modal positioned above the selected lines
