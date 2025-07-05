@@ -191,8 +191,8 @@ function M.edit_selection(is_visual)
       selected_text
     )
 
-    -- Create floating terminal modal
-    M.create_terminal_modal(prompt, start_line)
+    -- Execute Claude Code with the prompt
+    M.execute_claude_edit(prompt)
   end)
 end
 
@@ -271,56 +271,17 @@ function M.create_floating_input(prompt, callback)
   vim.keymap.set("n", "q", cancel_input, { buffer = input_buf, nowait = true })
 end
 
--- Create a floating terminal modal positioned above the selected lines
-function M.create_terminal_modal(prompt, position_line)
-  -- Create a new buffer for the terminal
-  local modal_buf = vim.api.nvim_create_buf(false, true)
-
-  -- Get editor dimensions
-  local editor_width = vim.o.columns
-  local editor_height = vim.o.lines
-
-  -- Calculate modal dimensions
-  local modal_width = math.min(config.modal_width, editor_width - 4)
-  local modal_height = config.modal_height
-
-  -- Calculate position - place modal above the selected line
-  local win_line = math.max(0, position_line - modal_height - 1)
-  local win_col = math.floor((editor_width - modal_width) / 2)
-
-  -- Ensure modal fits within screen bounds
-  if win_line + modal_height > editor_height - 2 then
-    win_line = math.max(0, editor_height - modal_height - 2)
-  end
-
-  -- Create floating window
-  local modal_win = vim.api.nvim_open_win(modal_buf, true, {
-    relative = "editor",
-    width = modal_width,
-    height = modal_height,
-    row = win_line,
-    col = win_col,
-    style = "minimal",
-    border = "rounded",
-    title = " Claude Code Edit ",
-    title_pos = "center",
-  })
-
-  -- Set terminal buffer options
-  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = modal_buf })
-  vim.api.nvim_set_option_value("buftype", "terminal", { buf = modal_buf })
-
-  -- Execute Claude command in the modal terminal
+-- Execute Claude Code with the given prompt
+function M.execute_claude_edit(prompt)
+  -- Execute Claude command in the background
   local cmd = string.format("%s -p %q", config.claude_command, prompt)
-
-  local job_id = vim.fn.termopen(cmd, {
+  
+  vim.notify("Executing Claude Code...", vim.log.levels.INFO)
+  
+  -- Run the command asynchronously
+  vim.fn.jobstart(cmd, {
     on_exit = function(_, exit_code, _)
       vim.schedule(function()
-        -- Close the modal window
-        if vim.api.nvim_win_is_valid(modal_win) then
-          vim.api.nvim_win_close(modal_win, true)
-        end
-
         if exit_code == 0 then
           -- Reload the file to show changes
           vim.cmd("edit!")
@@ -331,23 +292,6 @@ function M.create_terminal_modal(prompt, position_line)
       end)
     end,
   })
-
-  -- Set up key mappings for the modal
-  local function close_modal()
-    if vim.api.nvim_win_is_valid(modal_win) then
-      vim.api.nvim_win_close(modal_win, true)
-    end
-    if job_id then
-      vim.fn.jobstop(job_id)
-    end
-  end
-
-  -- Add escape key to close modal
-  vim.keymap.set("n", "<Esc>", close_modal, { buffer = modal_buf, nowait = true })
-  vim.keymap.set("t", "<Esc>", close_modal, { buffer = modal_buf, nowait = true })
-
-  -- Enter terminal mode
-  vim.cmd("startinsert")
 end
 
 return M
