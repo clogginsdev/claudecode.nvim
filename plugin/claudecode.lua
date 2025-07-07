@@ -8,6 +8,7 @@ if vim.fn.has("nvim-0.7.0") ~= 1 then
   return
 end
 
+-- Mark the plugin as loaded to prevent multiple loading
 vim.g.loaded_claudecode = true
 
 require("claudecode").setup()

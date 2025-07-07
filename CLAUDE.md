@@ -61,3 +61,8 @@ require("claudecode").setup({
 - Terminal buffer is set as unlisted and no-swap
 - Session state prevents multiple instances from opening simultaneously
 - Supports both vertical and horizontal splits with configurable sizing
+
+## Commit Preferences
+
+- Do not add co-author lines to commits
+- Do not include "Generated with Claude Code" attribution in commit messages
