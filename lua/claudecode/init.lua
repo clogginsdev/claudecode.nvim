@@ -276,16 +276,16 @@ function M.execute_claude_edit(prompt)
   -- Create a hidden terminal buffer for Claude Code
   local bufnr = vim.api.nvim_create_buf(false, true)
   
-  -- Set buffer options for terminal
-  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = bufnr })
-  vim.api.nvim_set_option_value("buftype", "terminal", { buf = bufnr })
-  
   -- Build the command
   local cmd = string.format("%s -p %q", config.claude_command, prompt)
   
   vim.notify("Executing Claude Code...", vim.log.levels.INFO)
   
-  -- Start terminal in the hidden buffer
+  -- We need to temporarily switch to the buffer to run termopen
+  local current_buf = vim.api.nvim_get_current_buf()
+  vim.api.nvim_set_current_buf(bufnr)
+  
+  -- Start terminal in the buffer
   local job_id = vim.fn.termopen(cmd, {
     on_exit = function(_, exit_code, _)
       vim.schedule(function()
@@ -306,12 +306,15 @@ function M.execute_claude_edit(prompt)
     end,
   })
   
-  if job_id == 0 then
-    vim.notify("Failed to start Claude Code terminal", vim.log.levels.ERROR)
-  elseif job_id == -1 then
-    vim.notify("Invalid arguments for Claude Code", vim.log.levels.ERROR)
-  else
+  -- Switch back to the original buffer
+  vim.api.nvim_set_current_buf(current_buf)
+  
+  -- Set buffer options after termopen
+  if job_id > 0 then
+    vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = bufnr })
     vim.notify("Claude Code started in background (buffer: " .. bufnr .. ")", vim.log.levels.INFO)
+  else
+    vim.notify("Failed to start Claude Code terminal", vim.log.levels.ERROR)
   end
 end
 
